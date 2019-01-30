@@ -5,6 +5,8 @@ import re
 import urllib
 import logging
 import codecs
+import csv
+import datetime
 
 log = logging.getLogger()
 log.setLevel(logging.INFO)
@@ -13,112 +15,45 @@ ch.setLevel(logging.INFO)
 ch.setFormatter(logging.Formatter('[%(levelname)s] %(funcName)s: %(message)s'))
 log.addHandler(ch)
 
-a=[]
-result=[]
-datetime2=''
-output = codecs.open('result.csv', 'w', encoding='utf-8') 
-
-def fetch(i, o):
-    try:
-        link = pq(o).find('a').attr('href')
-        date = pq(o).find('.lklbe').text()
-        date = re.sub(r'\n',r'',date)
-        date = re.sub(r'.*(\d{4}-\d{1,2}-\d{1,2}).*',r'\1',date)
-        datetime1 = time.strptime(date,'%Y-%m-%d')
-        if datetime1 > datetime2:
-            try:
-                a.index((link,date))
-            except ValueError:
-                log.debug('add' + date)
-                a.append((link,date))
-    except:
-        log.error('fetch error')
-        pass
-
-def parselist(d):
-    tdlist = d('td.f')
-    if tdlist:
-       tdlist.map(fetch) 
-       return True
-    else:
-       return False
-
-def parseFile(element):
-    iurl = 'http://zhidao.baidu.com'+element[0]
-    if not element[0]:
-        return False
-
-    try:
-        zhidaolist = urllib.urlopen(iurl)
-    except:
-        log.error('get error ' + iurl)
-        return False
-
-    if(zhidaolist.getcode() == 200):
-        log.info('parsing 200 ' + iurl)
-        content = zhidaolist.read().decode('gbk')
-        d = pq(content)   
-        title = d('h1#question-title').text()
-        name = d('#question-box .user-name').text()
-        date = element[1]
-        cont = d('#question-content').text()
-        try:
-            cont = re.sub(r'\r|\n',r' ',cont)
-        except:
-            log.error('parse error')
-            pass
-        r = "%s | %s | %s | %s | %s\n" % (title, name, date, iurl, cont)
-        log.debug(r)
-        output.write(r)
-    else:
-        log.error('404')
-    pass
-
-    return True
-        
-
-def main():
-
-    param1 = urllib.quote(sys.argv[1].decode('utf-8').encode('gbk'))
-    if len(sys.argv) >= 3:
-        try:
-            global datetime2
-            datetime2 = time.strptime(sys.argv[2],'%Y-%m-%d')
-        except:
-            datetime2 = time.strptime('1970-1-1','%Y-%m-%d')
-            pass
-    else:
-        log.info('no parameter "date"')
-        datetime2 = time.strptime('1970-1-1','%Y-%m-%d')
+def parseFile(url_key):
+    output = codecs.open(url_key + 'result.csv', 'w', encoding='utf-8-sig') 
+    param1 = urllib.parse.quote(url_key.encode('utf-8'))
+    f_csv = csv.writer(output)
     
-    
-    for i in range(0,1000,10):
+    for i in range(0,50,10):
+        print("_______________________begin______________________"+ datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         url = 'http://zhidao.baidu.com/q?ct=17&tn=ikaslist&word='+param1+'&pn='+str(i) 
         try:
-            zhidaolist = urllib.urlopen(url)
+            zhidaolist = urllib.request.urlopen(url)
         except:
             log.error('get error ' + url)
             continue
-        if(zhidaolist.getcode() == 200):
+        if(zhidaolist.status == 200):
             log.info('get 200 ' + url)
             content = zhidaolist.read().decode('gbk')
         else:
             log.error('404')
             continue
 
-        d = pq(content)   
-        if parselist(d):
-            pass
-        else:
-            log.info('end at ' + str(i))
-            break 
+        doc = pq(content)	
+        its=doc("dl").items()
 
-    for i, element in enumerate(a):
-        log.debug(element)
-        if(parseFile(element)==False):
-            continue
-
+        for it in its:
+            iurl = (it("a.ti").attr('href'))
+            title = (it("a.ti").text())
+            cont = (it("dd.dd.summary").text())
+            f_csv.writerow((iurl, title, cont))
+        print("_______________________rest______________________"+ datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        time.sleep(3)
     output.close()
+    
+
+def main():
+    parseFile("这道题")
+    parseFile("这题")
+    parseFile("题目")
+   
+    
     
 if __name__ == "__main__":
     main()
